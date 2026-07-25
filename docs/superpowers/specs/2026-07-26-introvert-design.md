@@ -21,7 +21,8 @@ command.
 
 ## Non-goals
 
-- No tier that breaks grammar. If a user wants fragments, caveman already exists.
+- No tier that breaks grammar, `max` included. If a user wants fragments, caveman already
+  exists and does it well.
 - No compression of input or reasoning tokens. Output tokens only. This is stated plainly in
   the README rather than implied away.
 - No claimed reduction percentage that has not been measured by the eval harness.
@@ -138,15 +139,32 @@ followed by a compressed recap. Exception: the user asks what the mode is.
 |---|---|---|---|
 | `lite` | Filler, hedging, preamble, sign-offs | Full sentence structure, all clauses | ~30–40% |
 | `full` (default) | Everything in lite, plus redundant clauses, restatements, padded phrasing | Complete grammatical sentences, always | ~65–70% |
+| `max` | Everything in full, plus every supporting clause that is not load-bearing. One sentence where one sentence carries the answer. Each fact stated once. | Complete grammatical sentences, always | ~75–80% |
+
+`max` reaches caveman's compression ratio without adopting caveman's method. It gets there by
+answering in fewer sentences, not by breaking the sentences it writes. Subject and verb are
+present in every sentence at `max`, exactly as at `lite`.
+
+The grammatical floor does not move between tiers. Only the amount of supporting detail does.
+`max` is where that floor is hardest to hold, so the eval harness weights `max` most heavily —
+a fragment produced at `max` is a release blocker, not an acceptable cost of the tier.
+
+Example — "Why is my React component re-rendering?"
+
+- `lite`: "Your component re-renders because you create a new object reference on each render.
+  Passing an inline object as a prop defeats React's shallow comparison. Wrap it in `useMemo`."
+- `full`: "The inline object prop creates a new reference each render, which defeats shallow
+  comparison. Wrap it in `useMemo`."
+- `max`: "The inline object prop creates a new reference each render. Wrap it in `useMemo`."
 
 Targets are hypotheses until the eval harness measures them. Published numbers come from
 measurement only.
 
 ## Activation
 
-**On:** `/introvert`, `/introvert lite`, `/introvert full`; natural phrases — "introvert
-mode", "quiet mode", "talk less", "be minimal", "less words", "stop rambling", "fewer
-tokens".
+**On:** `/introvert`, `/introvert lite`, `/introvert full`, `/introvert max`; natural
+phrases — "introvert mode", "quiet mode", "talk less", "be minimal", "less words", "stop
+rambling", "fewer tokens".
 
 A one-off "be brief" is not a trigger. It asks for one short answer, not a mode change.
 
