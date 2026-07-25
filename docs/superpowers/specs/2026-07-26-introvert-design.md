@@ -1,0 +1,222 @@
+# introvert — Design Spec
+
+**Date:** 2026-07-26
+**Status:** Approved for planning
+**Repo:** https://github.com/DeepakGanapathi97/introvert
+
+## Problem
+
+Caveman cuts ~65% of output tokens by breaking language: dropped articles, missing verbs,
+sentence fragments. That trade works for solo hacking. It fails in enterprise code work,
+where an ambiguous instruction about a migration or an auth check costs more than the tokens
+it saved. Teams that will not accept degraded response quality currently have no token-saving
+option — they pay full verbosity or they squint at fragments.
+
+## Goal
+
+A skill that cuts output tokens at roughly caveman's ratio while every sentence stays
+complete, grammatical, and unambiguous — and reads as if a senior engineer wrote it, not a
+model. Distributed on npm so any developer on any of four major agents can install it in one
+command.
+
+## Non-goals
+
+- No tier that breaks grammar. If a user wants fragments, caveman already exists.
+- No compression of input or reasoning tokens. Output tokens only. This is stated plainly in
+  the README rather than implied away.
+- No claimed reduction percentage that has not been measured by the eval harness.
+
+## Architecture
+
+Approach: **adapter pattern with one canonical rule set.**
+
+```
+introvert/
+├── bin/install.js            # npx entrypoint: detect agents, dispatch to adapters
+├── src/
+│   ├── rules.md              # SINGLE SOURCE OF TRUTH for behavior
+│   └── adapters/
+│       ├── claude-code.js    # → ~/.claude/skills/introvert/SKILL.md + command
+│       ├── cursor.js         # → ~/.cursor/skills/introvert/SKILL.md
+│       ├── codex.js          # → Codex skill/AGENTS.md format
+│       └── gemini.js         # → gemini-extension.json + prompt file
+├── skills/introvert/SKILL.md # prebuilt Claude Code artifact (plugin marketplace)
+├── commands/introvert.md     # /introvert slash command
+├── evals/                    # measurement corpus + harness
+├── tests/                    # installer unit tests
+├── package.json              # name: introvert-skill, bin: introvert
+└── README.md
+```
+
+Every agent-specific file is generated from `src/rules.md`. A rule fix is a one-file edit,
+not a four-file edit. Adding a fifth agent is one new adapter.
+
+**Rejected alternatives:** four hand-maintained rule files (divergence guaranteed, works
+against the "stricter rules" goal); one file copied verbatim (breaks — agents need different
+metadata formats: YAML frontmatter vs JSON manifest vs plain instructions).
+
+## Core rules
+
+Governing principle:
+
+> Cut what adds no information. Never cut what makes a sentence require re-reading.
+
+### Always drop
+
+- Preamble: "Sure!", "I'd be happy to help", "Great question", "Let me take a look"
+- Sign-offs: "Let me know if you need anything else", "Hope this helps"
+- Hedging that adds no information: "I think it might possibly be"
+- Filler adverbs: just, really, basically, actually, simply
+- Restating the question before answering it
+- Tool-call narration ("Now I'll read the file...")
+- Decorative emoji and tables
+- Raw error-log dumps beyond the one decisive line, unless more is requested
+
+### Never drop
+
+Articles (a/an/the). Verbs. Conjunctions. Sentence structure.
+
+Every output is a complete grammatical sentence that could be pasted into a PR comment
+unedited. No fragments, at any level. This is the product boundary, not a style preference.
+
+### Compress by word choice, not by deletion
+
+"fix" not "implement a solution for". "use" not "make use of". The sentence stays whole;
+density comes from precise wording and cutting redundancy.
+
+Never invent abbreviations (cfg, impl, req, res, fn). They tokenize the same as the full word
+— zero tokens saved, clarity lost for free. Standard acronyms (DB, API, HTTP) are fine.
+No arrow shorthand (→) for the same reason: its own token, saves nothing.
+
+Technical terms, identifiers, file paths, and error strings are quoted exact, never
+paraphrased.
+
+### Human-register filter
+
+Compressed text still reads as machine-written if it keeps the vocabulary of machine writing.
+These cuts serve both goals at once — the tell-words are usually padding.
+
+Banned vocabulary: delve, crucial, intricate, pivotal, testament, underscore, leverage (as a
+verb), landscape (figurative), meticulous, garner, boast/boasts, foster/fostering, showcase,
+align with, enhance, robust, seamless, comprehensive, holistic, unlock, elevate, empower.
+
+Say "is", not "serves as" / "stands as" / "represents" / "functions as". Say "has", not
+"boasts" / "features" / "maintains". Substituting a heavier verb for a plain one is padding
+in costume.
+
+No negative parallelism: "not just X, but Y", "it's not X, it's Y". Extra words, no extra
+information — the exact opposite of the skill's purpose.
+
+No rule-of-three padding. One adjective where one will do. If two synonyms do the same job,
+keep one.
+
+No decorative em dashes or blanket bolding. Both mark genuine structural breaks only.
+
+No collaborative framing: "as we can see", "let's look at", "consider this".
+
+Source for the tell-list: Wikipedia, *Signs of AI writing*.
+
+### Language preservation
+
+Reply in the user's language. Compress the style, not the language. Technical terms, code,
+CLI commands, and error strings stay verbatim regardless of language.
+
+### No self-reference
+
+Never announce the mode. No "introvert mode on", no "Introvert:" prefix, no normal answer
+followed by a compressed recap. Exception: the user asks what the mode is.
+
+## Intensity levels
+
+| Level | Cuts | Keeps | Target |
+|---|---|---|---|
+| `lite` | Filler, hedging, preamble, sign-offs | Full sentence structure, all clauses | ~30–40% |
+| `full` (default) | Everything in lite, plus redundant clauses, restatements, padded phrasing | Complete grammatical sentences, always | ~65–70% |
+
+Targets are hypotheses until the eval harness measures them. Published numbers come from
+measurement only.
+
+## Activation
+
+**On:** `/introvert`, `/introvert lite`, `/introvert full`; natural phrases — "introvert
+mode", "quiet mode", "talk less", "be minimal", "less words", "stop rambling", "fewer
+tokens".
+
+A one-off "be brief" is not a trigger. It asks for one short answer, not a mode change.
+
+**Off:** `/introvert off`, "stop introvert", "normal mode", "verbose mode".
+
+**Persistence:** active on every response until explicitly turned off or the session ends.
+Models drift back to verbosity after several turns, so `SKILL.md` states this explicitly
+rather than assuming it. Level persists until changed.
+
+## Yield rules
+
+Compression suspends fully — not partially — in these cases, then resumes automatically:
+
+1. **Another skill dictates output format.** Introvert governs prose style; it never
+   overrides another skill's required structure. It yields, then resumes when that skill's
+   output ends.
+2. **Security warnings.** Full clear language.
+3. **Destructive or irreversible action confirmations.** Full clear language.
+4. **Multi-step sequences** where losing a clause risks misordering steps.
+5. **User asks for clarification or repeats a question.** The compression failed; answer
+   fully.
+
+Always verbatim, never compressed: code blocks, commit messages, PR bodies, error strings,
+generated file contents.
+
+## Installer
+
+`npx introvert-skill` — detects installed agents, installs to each.
+
+- Detection: presence of `~/.claude`, `~/.cursor`, `~/.codex`, `~/.gemini`, plus
+  project-local equivalents.
+- Flags: `--agent <name>` to force a target, `--uninstall`, `--dry-run`, `--yes`.
+- Idempotent. Backs up any existing file before overwrite. Prints exactly what it wrote.
+- Node >= 18, zero runtime dependencies.
+
+npm package name is `introvert-skill` (`introvert` is taken by a stale v0.0.2). Binary is
+`introvert`. Same pattern as caveman, whose package is `caveman-installer`.
+
+## Evals and testing
+
+**Installer tests** (`tests/`): agent detection, correct file paths per adapter, idempotency,
+backup-before-overwrite, uninstall removes exactly what was installed.
+
+**Eval harness** (`evals/`): a corpus of realistic enterprise prompts — auth bug diagnosis,
+schema migration, code review, architecture question, incident triage. For each prompt,
+capture baseline / lite / full responses and check:
+
+1. **Token reduction** — measured with a real tokenizer, not estimated.
+2. **Grammaticality** — every sentence complete. Any fragment is a failing result.
+3. **AI-tell scan** — the banned vocabulary list must return zero hits.
+4. **Information parity** — a reviewer confirms no technical fact was lost between baseline
+   and compressed output.
+
+Failing any of 2, 3, or 4 blocks a release regardless of how good the token number looks.
+
+## Error handling
+
+- Unwritable target directory: report the path and the reason, skip that agent, continue with
+  the rest, exit non-zero.
+- No agents detected: print supported agents and the `--agent` flag, exit non-zero.
+- Existing introvert install found: overwrite after backup, report both paths.
+
+## Distribution
+
+npm (`npx introvert-skill`), the Claude Code plugin marketplace, and the GitHub repo itself.
+MIT licensed.
+
+README requirements, given that the previous attempt's presentation was the weak point:
+
+- Install one-liner in the first screen of content.
+- Before/after examples using real measured token counts, no invented figures.
+- Honest statement that only output tokens are affected, and that the skill itself costs
+  roughly 1–1.5k input tokens per turn.
+- Explicit comparison to caveman that credits it — introvert is a different trade-off, not a
+  replacement.
+
+## Open questions
+
+None blocking. Percentage targets are validated by the eval harness during implementation.
