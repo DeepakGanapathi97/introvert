@@ -1,0 +1,306 @@
+{
+  "summary": {
+    "model": "sonnet",
+    "promptCount": 5,
+    "completedCount": 5,
+    "failedCount": 0,
+    "levels": {
+      "lite": {
+        "meanReduction": 50.9,
+        "medianReduction": 56.3,
+        "totalBaselineTokens": 18966,
+        "totalLevelTokens": 8605,
+        "grammaticalFailures": 0,
+        "bannedWordFailures": 0,
+        "factsLostFailures": 1,
+        "ambiguousFailures": 1,
+        "meanArticleDensity": 10.7
+      },
+      "full": {
+        "meanReduction": 52.9,
+        "medianReduction": 54.3,
+        "totalBaselineTokens": 18966,
+        "totalLevelTokens": 8451,
+        "grammaticalFailures": 0,
+        "bannedWordFailures": 0,
+        "factsLostFailures": 1,
+        "ambiguousFailures": 1,
+        "meanArticleDensity": 9.7
+      },
+      "max": {
+        "meanReduction": 84.8,
+        "medianReduction": 93,
+        "totalBaselineTokens": 18966,
+        "totalLevelTokens": 1894,
+        "grammaticalFailures": 1,
+        "bannedWordFailures": 0,
+        "factsLostFailures": 2,
+        "ambiguousFailures": 1,
+        "meanArticleDensity": 8.3
+      }
+    },
+    "baselineArticleDensity": 7.3
+  },
+  "rows": [
+    {
+      "id": "auth-bug",
+      "category": "debugging",
+      "prompt": "My Express auth middleware lets expired JWTs through. The check is `if (decoded.exp < Date.now())` and I'm comparing against a token with an exp of 1735689600. What's wrong?",
+      "baseline": {
+        "outputTokens": 9018,
+        "text": "**Using systematic-debugging: root cause found.**\n\nThe bug is a **units mismatch**, not a logic typo.\n\n- `decoded.exp` (the JWT `exp` claim) is defined by the JWT spec (RFC 7519) as a **NumericDate — seconds since epoch**. Every standard library (`jsonwebtoken`, etc.) sets it in seconds.\n- `Date.now()` returns **milliseconds** since epoch.\n\nYou're comparing a seconds-scale number to a milliseconds-scale number directly, and JS just compares the raw numbers — it has no idea one is 1000x a different scale.\n\n**Concrete evidence with your numbers:**\n- `decoded.exp = 1735689600` → that's Jan 1, 2025 00:00:00 UTC (in seconds).\n- `Date.now()` right now (2026‑07‑26) ≈ `1785024000000` (in **milliseconds**).\n- `1735689600 < 1785024000000` → **true**, every time.\n\nThat's the tell: because a seconds-based timestamp (~1.7×10⁹) is always numerically dwarfed by a milliseconds-based \"now\" (~1.78×10¹²), this comparison evaluates the same way regardless of whether the token is actually expired or not — it carries no real signal. So whichever branch your code treats as the \"true\" case runs unconditionally. Given your symptom (expired tokens sail through), that branch is evidently the \"allow\" path — meaning every token, expired or not, hits it.\n\n**Fix — make the units match:**\n```js\nif (decoded.exp * 1000 < Date.now()) {\n  return res.status(401).json({ message: 'Token expired' });\n}\n```\nor equivalently `decoded.exp < Date.now() / 1000`.\n\n**Better fix — don't hand-roll it at all.** `jwt.verify()` already checks `exp` correctly (in seconds) and throws `TokenExpiredError` for you:\n\n```js\ntry {\n  const decoded = jwt.verify(token, secret); // throws if expired\n  req.user = decoded;\n  next();\n} catch (err) {\n  if (err.name === 'TokenExpiredError') return res.status(401).json({ message: 'Token expired' });\n  return res.status(401).json({ message: 'Invalid token' });\n}\n```\n\nIf you're currently calling `jwt.verify(token, secret, { ignoreExpiration: true })` and doing the manual check afterward, that's the smell to look for — drop `ignoreExpiration` and let the library handle it, since manual expiry math is exactly how this class of bug creeps in.",
+        "bannedHits": [],
+        "articleDensity": 8.71,
+        "wordCount": 241
+      },
+      "levels": {
+        "lite": {
+          "outputTokens": 3772,
+          "reduction": 58.2,
+          "bannedHits": [],
+          "articleDensity": 12.8,
+          "wordCount": 125,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [
+            "Incorrectly implies the comparison only 'happens to work' for the given example because 1735689600 is far in the past, when in fact decoded.exp < Date.now() evaluates true for essentially any token (past or future) due to the seconds-vs-milliseconds scale gap — the bug isn't limited to tokens expiring near the present/future, it affects the given example identically to every other case."
+          ],
+          "ambiguous": true,
+          "text": "The bug is a unit mismatch: a JWT's `exp` claim is a Unix timestamp in seconds, while `Date.now()` returns milliseconds. Comparing them directly means `decoded.exp` (a ~10-digit number) is checked against a ~13-digit number, so the comparison doesn't mean what you think it means for tokens expiring anywhere near the present or near future — it only happens to \"work\" for your example because 1735689600 (Jan 1, 2025) is far enough in the past that the raw numbers still land on the right side.\n\nFix it by converting units consistently, either:\n\n```js\nif (decoded.exp * 1000 < Date.now())\n```\n\nor\n\n```js\nif (decoded.exp < Math.floor(Date.now() / 1000))\n```\n\nAlso make sure the branch that evaluates true actually rejects the request (`return res.status(401)...`) rather than falling through to `next()` — a missing `return` after a truthy expiry check is the other common way expired tokens slip through."
+        },
+        "full": {
+          "outputTokens": 4117,
+          "reduction": 54.3,
+          "bannedHits": [],
+          "articleDensity": 10.94,
+          "wordCount": 64,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "`decoded.exp` is a Unix timestamp in seconds; `Date.now()` returns milliseconds. Because a seconds-based value is always numerically smaller than the current millisecond epoch, `decoded.exp < Date.now()` is true for essentially every token regardless of actual expiry, so it carries no real signal for whether the token has expired. Fix by comparing in the same unit: `if (decoded.exp * 1000 < Date.now())` (or `decoded.exp < Date.now() / 1000`), and make sure that branch is the one that rejects the request."
+        },
+        "max": {
+          "outputTokens": 485,
+          "reduction": 94.6,
+          "bannedHits": [],
+          "articleDensity": 6.9,
+          "wordCount": 29,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "`exp` is in seconds since epoch, but `Date.now()` returns milliseconds, so the comparison is off by a factor of 1000 (1735689600 looks like seconds, i.e. Jan 2025). Fix: `if (decoded.exp * 1000 < Date.now())` or compare `decoded.exp < Date.now() / 1000`."
+        }
+      }
+    },
+    {
+      "id": "redis-decision",
+      "category": "yes-no-decision",
+      "prompt": "We have a leaderboard that needs top-100 reads about 5000 times a second, updated on every score change. Should we use Redis for this or is Postgres enough?",
+      "baseline": {
+        "outputTokens": 2816,
+        "text": "This is a classic case where Redis's sorted-set (ZSET) structure was basically designed for exactly this problem, so I'd lean Redis — but let me lay out why, and where Postgres genuinely can hold its own, so it's a reasoned choice rather than a reflex.\n\n## Why Redis fits well here\n\nA Redis ZSET stores members ranked by score with:\n- `ZADD` — O(log N) per score update\n- `ZREVRANGE key 0 99 WITHSCORES` — O(log N + 100) to pull top-100\n- `ZRANK`/`ZREVRANK` — O(log N) if you also need \"what's my rank\"\n\nAt 5,000 reads/sec plus a write on every score change, a single Redis instance handles this without breaking a sweat — it's routinely used for leaderboards at 10-100x that load. Everything lives in memory, so both the read and the write are sub-millisecond, and there's no query planning, no lock contention, no index maintenance overhead.\n\n## Where Postgres struggles specifically for this pattern\n\nPostgres *can* do `ORDER BY score DESC LIMIT 100` with a B-tree index on `score`, and if your dataset fits in `shared_buffers`, that query is fast in isolation. The problem is the combination:\n\n- **Write amplification**: every score change is an `UPDATE`, which means an index update (B-tree on `score` changes on basically every write since score is the sort key), MVCC bloat (dead tuples), and eventual autovacuum overhead.\n- **Read/write contention**: 5,000 reads/sec of the same hot range query, concurrent with constant writes to the rows in that same range, means you're fighting over the same buffer pages and index pages constantly.\n- **Connection overhead**: 5,000 QPS means either a large connection pool or pgbouncer-style multiplexing — solvable, but it's infrastructure you now have to run well, whereas Redis clients are cheap and typically pipeline/multiplex naturally.\n\nNone of this is fatal — people do run high-QPS leaderboards on Postgres — but you'd be fighting the tool instead of using one built for the job.\n\n## Practical recommendation\n\n**Hybrid, not either/or:**\n- **Postgres** stays the system of record — durable, ACID, source of truth for user scores, history, audits, and anything transactional (e.g., \"score can only increase,\" fraud checks, joins with user data).\n- **Redis ZSET** is the live leaderboard cache — updated synchronously (or via a lightweight worker/outbox) whenever a score changes in Postgres, and it's what actually serves the 5,000 reads/sec.\n\nThis gives you Postgres's durability/consistency guarantees without asking it to serve a hot, high-frequency ranked-range query it isn't specialized for.\n\n**If you want to avoid running two systems**, a cheaper middle ground: keep everything in Postgres, but don't recompute top-100 on every read — cache the top-100 result (in-process LRU or a single Redis key holding the serialized list) and refresh it on writes, optionally debounced (e.g., refresh at most every 200-500ms even if scores change more often than that). This cuts your actual DB query rate by orders of magnitude and is a reasonable option if a few hundred ms of staleness on the leaderboard is acceptable — worth clarifying with product before you build either path, since \"updated on every score change\" might mean \"eventually visible\" rather than \"strictly real-time.\"\n\n**Bottom line**: for reads at that frequency with real-time-ish updates, plain Postgres alone is going to be doing more work than it needs to. Redis ZSETs are the right primitive; keep Postgres underneath for durability if you need it.",
+        "bannedHits": [],
+        "articleDensity": 6.39,
+        "wordCount": 548
+      },
+      "levels": {
+        "lite": {
+          "outputTokens": 1231,
+          "reduction": 56.3,
+          "bannedHits": [],
+          "articleDensity": 10.11,
+          "wordCount": 188,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Redis, via a sorted set, is the better fit here. `ZADD` on score change and `ZREVRANGE 0 99` for top-100 are both logarithmic and served entirely from memory, so 5000 reads/sec is trivial, and there's no lock contention on the hot path the way there can be with a B-tree index under heavy concurrent writes.\n\nPostgres *can* technically sustain 5000 reads/sec of an indexed `ORDER BY score DESC LIMIT 100` query if the table is small enough to stay in shared_buffers/OS cache and you front it with pgbouncer, but you'd be fighting index bloat and vacuum overhead from constant updates, and you'd likely need a read replica to isolate the leaderboard traffic from the rest of your write load anyway — at which point you've built a bespoke cache that Redis gives you off the shelf.\n\nThe common production pattern is Redis sorted set as the live leaderboard (read/write hot path) with Postgres as the durable source of truth, writing through or periodically syncing so you can rebuild the sorted set if Redis data is lost. The trade-off is eventual consistency and an extra moving piece to operate, but for 5000 qps that's the standard trade worth making."
+        },
+        "full": {
+          "outputTokens": 1201,
+          "reduction": 57.4,
+          "bannedHits": [],
+          "articleDensity": 7.41,
+          "wordCount": 108,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Use Redis, with a sorted set (ZSET) keyed by score. ZADD on every score change and ZREVRANGE for top-100 are both O(log n), and a single Redis instance handles tens of thousands of these ops per second, so 5000 reads/sec is comfortable. Postgres can technically serve this too with an indexed `ORDER BY score DESC LIMIT 100`, but at that read rate combined with constant writes you'll fight index/buffer churn and connection overhead for a query pattern Redis is purpose-built for. Keep Postgres as the durable source of truth and write-through to Redis for the hot leaderboard path — that gives you correctness on the write side and speed on the read side."
+        },
+        "max": {
+          "outputTokens": 104,
+          "reduction": 96.3,
+          "bannedHits": [],
+          "articleDensity": 11.32,
+          "wordCount": 53,
+          "grammatical": false,
+          "fragments": [
+            "Redis."
+          ],
+          "factsLost": [
+            "Omits that Postgres should remain the durable system of record with Redis as a write-through cache — without this, a reader could migrate scores entirely into Redis and lose durability/ACID guarantees on score data."
+          ],
+          "ambiguous": true,
+          "text": "Redis. Postgres can serve a top-100 query fast with an index, but at 5000 reads/sec plus a write on every score change, you'd be hammering the same rows with constant re-sorting and lock contention. Redis sorted sets do both the update and the top-N read in O(log N), built for exactly this pattern."
+        }
+      }
+    },
+    {
+      "id": "migration-steps",
+      "category": "ordered-steps",
+      "prompt": "Walk me through safely adding a NOT NULL column with a default to a 40 million row Postgres table in production without downtime.",
+      "baseline": {
+        "outputTokens": 3635,
+        "text": "No skill in the list matches this — it's a conceptual walkthrough of a database migration technique, not a coding task, bug, or feature build in this repo. I'll answer directly.\n\n# Adding a NOT NULL column with a default to a 40M row table, zero downtime\n\nThe core danger in old Postgres versions (<11) was that `ADD COLUMN ... DEFAULT x` rewrote the entire table under an `ACCESS EXCLUSIVE` lock — on 40M rows that's minutes of total unavailability. **Postgres 11+ fixed the \"add column with constant default\" case** — it's now a metadata-only change (O(1), instant) as long as the default is a constant. So step zero is knowing your PG version, because it changes the whole plan.\n\n## Step 0: Check your Postgres version\n\n```sql\nSELECT version();\n```\n\n- **PG 11+**: `ADD COLUMN col type NOT NULL DEFAULT constant` is fast (metadata-only) *if the default is a truly constant expression* (not `now()`, not a function with volatile/non-constant result, not another column). This is the easy path — see below.\n- **PG < 11**, or your default is **non-constant/volatile**, or you also need to backfill based on other columns' data: you need the multi-step expand/contract pattern.\n\n---\n\n## Path A: PG 11+ with a constant default (common case)\n\nIf e.g. `status text NOT NULL DEFAULT 'active'`, just run:\n\n```sql\nALTER TABLE big_table\n  ADD COLUMN status text NOT NULL DEFAULT 'active';\n```\n\nThis is instant regardless of row count — Postgres stores the default in the catalog and materializes it lazily on read for old rows; new rows get it written normally. It still takes a brief `ACCESS EXCLUSIVE` lock, but only for the duration of the catalog update (milliseconds), **not** proportional to table size.\n\n**Still be careful about lock queueing**: even a millisecond `ACCESS EXCLUSIVE` lock has to wait behind any long-running transaction holding a weaker lock on that table (e.g. a slow analytical query holding `ACCESS SHARE`), and every query that arrives after your `ALTER` queues behind it too — a classic lock queue pileup. Mitigate with:\n\n```sql\nSET lock_timeout = '2s';  -- fail fast and retry rather than blocking everything\nALTER TABLE big_table ADD COLUMN status text NOT NULL DEFAULT 'active';\n```\n\nWrap in a retry loop in your migration tool if it fails on `lock_timeout`.\n\nIf this applies to you, you're basically done — skip to \"General precautions\" below.\n\n---\n\n## Path B: Need per-row backfill (PG < 11, or default computed from other data, e.g. `NOT NULL` with no meaningful default, or volatile default)\n\nThis is the classic **expand/contract** migration, done in separate deploys/transactions so no single step locks the table for long or blocks application traffic.\n\n### Step 1: Add the column as nullable, no default (or a cheap constant default)\n\n```sql\nALTER TABLE big_table ADD COLUMN new_col int;\n```\nFast metadata-only change in any modern PG version (nullable column addition has always been cheap).\n\n### Step 2: Backfill in small batches, not one giant UPDATE\n\nA single `UPDATE big_table SET new_col = ...` over 40M rows will:\n- Hold locks / generate WAL for the whole table in one transaction\n- Bloat the table massively (each row rewritten = dead tuple)\n- Risk replication lag / long-running transaction blocking vacuum\n\nInstead batch it, e.g. by primary key range:\n\n```sql\nDO $$\nDECLARE\n  batch_size int := 5000;\n  max_id bigint;\n  cur_id bigint := 0;\nBEGIN\n  SELECT max(id) INTO max_id FROM big_table;\n  WHILE cur_id <= max_id LOOP\n    UPDATE big_table\n      SET new_col = <computed_value>\n      WHERE id > cur_id AND id <= cur_id + batch_size\n        AND new_col IS NULL;\n    cur_id := cur_id + batch_size;\n    COMMIT; -- if run outside a DO block / via a script, commit each batch\n    PERFORM pg_sleep(0.05); -- throttle to reduce replication lag / IO pressure\n  END LOOP;\nEND $$;\n```\n\nIn practice, do this from an external script (Python/Ruby/etc.) or a migration tool that supports batching (e.g. `pg-osc`-style tools, or gems like `strong_migrations`), not a raw `DO` block, so you get:\n- Real per-batch commits (a `DO` block is one transaction — bad, defeats the purpose)\n- Ability to pause/resume/monitor progress\n- Backoff based on replication lag (`pg_stat_replication`) or load\n\nUse `WHERE new_col IS NULL` in the predicate so it's idempotent/resumable.\n\n### Step 3: Add the NOT NULL constraint without a full table scan lock\n\nDirectly adding `NOT NULL` normally requires a full table scan under `ACCESS EXCLUSIVE` to verify no NULLs exist. Avoid that by first adding a `CHECK` constraint as `NOT VALID`, then validating it separately, then promoting to `NOT NULL`:\n\n```sql\n-- Fast: only checks new rows going forward, doesn't scan existing rows\nALTER TABLE big_table\n  ADD CONSTRAINT new_col_not_null CHECK (new_col IS NOT NULL) NOT VALID;\n\n-- Slow, but only takes SHARE UPDATE EXCLUSIVE (doesn't block reads/writes)\nALTER TABLE big_table VALIDATE CONSTRAINT new_col_not_null;\n```\n\n`VALIDATE CONSTRAINT` scans the table but uses a lock level that permits concurrent reads and writes — this is the key trick.\n\nThen (PG 12+), promote the check into a real `NOT NULL` metadata flag cheaply because Postgres can use the validated check constraint as proof:\n\n```sql\nALTER TABLE big_table ALTER COLUMN new_col SET NOT NULL;\nALTER TABLE big_table DROP CONSTRAINT new_col_not_null; -- optional cleanup, now redundant\n```\nOn PG 12+, `SET NOT NULL` will skip the full scan if it finds a validated `CHECK (col IS NOT NULL)` constraint covering it — this step becomes metadata-only. On older versions this step itself does a full scan under exclusive lock, so it's genuinely important to be on 12+ for this trick to fully pay off (11 also has a variant of this).\n\n### Step 4: Set the default for new rows going forward (if you want a default rather than requiring app to always populate it)\n\n```sql\nALTER TABLE big_table ALTER COLUMN new_col SET DEFAULT <value>;\n```\nMetadata-only, instant.\n\n---\n\n## Application-side coordination (matters regardless of path)\n\nBecause you likely have app code that inserts rows and doesn't yet know about `new_col`:\n\n1. **Deploy 1**: Add the nullable column (Step 1). Deploy app code that writes `new_col` on all new inserts/updates going forward (dual-write), but don't require it yet.\n2. **Backfill** existing NULL rows (Step 2).\n3. **Deploy 2**: Add the `NOT NULL` constraint (Step 3) only after you've confirmed the backfill is complete and app code has been writing the column for a while (so no in-flight code path still inserts without it).\n4. Add `DEFAULT` (Step 4) if desired, and let old app code paths rely on it if any remain — though ideally by this point all writers are already populating it explicitly.\n\nThis ordering avoids the classic failure mode: adding `NOT NULL` before all code paths write the column, which causes runtime `INSERT`/`UPDATE` failures in production.\n\n## General precautions (both paths)\n\n- **Take a lock_timeout + retry approach for every DDL statement** against a hot table — never let an `ALTER TABLE` block indefinitely behind a long transaction while also blocking everyone behind it:\n  ```sql\n  SET lock_timeout = '2s';\n  SET statement_timeout = '5s'; -- for VALIDATE/backfill steps, tune much higher or off\n  ```\n- **Run backfills during low-traffic windows** and monitor replication lag (`pg_stat_replication`), autovacuum activity, and `pg_stat_activity` for lock waits while it runs.\n- **Watch for bloat**: batched UPDATEs over 40M rows will still generate significant dead tuples; make sure autovacuum keeps up, or manually `VACUUM (ANALYZE)` the table after the backfill completes.\n- **Use a migration tool that already encodes this pattern** if you're on Rails/Django/etc. — `strong_migrations` (Rails) explicitly detects and blocks the unsafe raw versions of these operations and enforces the safe multi-step pattern; similar guardrails exist elsewhere. Worth adopting so this doesn't have to be manually gotten right every time.\n- **Test the batched backfill script against a staging clone with representative row count** before running in prod, and make it resumable/idempotent (the `WHERE col IS NULL` guard) in case it's interrupted.\n\n## TL;DR decision tree\n\n- PG 11+ and default is a real constant → single `ALTER TABLE ADD COLUMN ... NOT NULL DEFAULT x`, wrapped with a `lock_timeout` + retry. Done.\n- Otherwise → add nullable column → dual-write from app → batch-backfill with throttling → `CHECK (...) NOT VALID` → `VALIDATE CONSTRAINT` → `SET NOT NULL` → `SET DEFAULT` → drop redundant check constraint.",
+        "bannedHits": [],
+        "articleDensity": 7.82,
+        "wordCount": 1048
+      },
+      "levels": {
+        "lite": {
+          "outputTokens": 1506,
+          "reduction": 58.6,
+          "bannedHits": [],
+          "articleDensity": 8.75,
+          "wordCount": 263,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "No skill in the list fits a conceptual database question like this — skills here cover coding tasks in a repo, not answering engineering questions from knowledge. Answering directly.\n\nDo it in stages so no single step holds a long lock or does a full table rewrite:\n\n1. **Add the column nullable, no default:** `ALTER TABLE t ADD COLUMN c type;` — this is metadata-only and near-instant on any Postgres version.\n2. **Set the column default separately:** `ALTER TABLE t ALTER COLUMN c SET DEFAULT ...;` — also metadata-only, applies to new rows going forward. (On Postgres 11+, adding a column with a constant default directly is also metadata-only, but splitting the steps keeps this approach version-agnostic and lets you backfill on your own schedule.)\n3. **Backfill existing rows in small batches**, e.g. `UPDATE t SET c = default WHERE c IS NULL AND id BETWEEN x AND y`, committing each batch, ideally via `id` range or ctid scan rather than one giant UPDATE — avoids a long-running transaction, bloat, and replication lag on 40M rows. Throttle with sleeps between batches if replicas are sensitive.\n4. **Add the NOT NULL constraint safely**: first `ALTER TABLE t ADD CONSTRAINT c_not_null CHECK (c IS NOT NULL) NOT VALID;` (instant, no scan), then `ALTER TABLE t VALIDATE CONSTRAINT c_not_null;` (scans the table but only takes a `SHARE UPDATE EXCLUSIVE` lock, so reads/writes aren't blocked).\n5. On Postgres 12+, run `ALTER TABLE t ALTER COLUMN c SET NOT NULL;` — it detects the validated check constraint and skips the full-table re-scan, taking only a brief lock. Then drop the now-redundant check constraint.\n6. Throughout, set a short `lock_timeout` (and retry on failure) for every DDL statement, so a blocked `ACCESS EXCLUSIVE` attempt doesn't queue behind long-running queries and stall the whole app.\n\nOn pre-12 Postgres, skip step 5's shortcut — `SET NOT NULL` will always do a full table scan under lock, so keep the validated CHECK constraint as your enforcement mechanism instead of converting it."
+        },
+        "full": {
+          "outputTokens": 1061,
+          "reduction": 70.8,
+          "bannedHits": [],
+          "articleDensity": 8.01,
+          "wordCount": 337,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [
+            "Step 1 asserts the single-step `ADD COLUMN c int NOT NULL DEFAULT 5` is fast on PG11+, then immediately contradicts itself claiming 'that only works if you add it nullable-with-default first... Postgres still validates it against existing rows unless you set it up in two phases' — this is false for PG11+ (the whole point of the single-step form is that no validation scan occurs) and could lead a reader to believe the safe one-step path is unsafe or nonexistent."
+          ],
+          "ambiguous": true,
+          "text": "Add the column and default in two separate, non-blocking steps, then backfill and validate the constraint separately, so no step holds a long-lived lock or rewrites the table at once.\n\n1. **Add the column as nullable, with a default, in one fast DDL.** On Postgres 11+, `ALTER TABLE t ADD COLUMN c int NOT NULL DEFAULT 5` no longer rewrites the table or scans all 40 million rows — the default is stored as metadata and applied lazily on read, so this takes a brief metadata lock (milliseconds) rather than an exclusive table-rewrite lock. But that only works if you add it nullable-with-default first, not NOT NULL directly — the NOT NULL constraint itself is what you need to defer, since Postgres still validates it against existing rows unless you set it up in two phases.\n2. **Actually run it as: add nullable column with default, no NOT NULL yet.** `ALTER TABLE t ADD COLUMN c int DEFAULT 5;` — instant, metadata-only.\n3. **Backfill existing rows in batches**, e.g. `UPDATE t SET c = 5 WHERE c IS NULL AND id BETWEEN x AND y`, committing every few thousand rows (via a loop in a script, not one giant transaction) so you don't hold long transactions, bloat, or replication lag. Add a short `pg_sleep` between batches if replicas need to keep up.\n4. **Add the NOT NULL constraint as NOT VALID first, then validate separately.** Use `ALTER TABLE t ADD CONSTRAINT c_not_null CHECK (c IS NOT NULL) NOT VALID;` — this takes only a brief lock since it doesn't scan existing rows. Then run `ALTER TABLE t VALIDATE CONSTRAINT c_not_null;`, which scans the table but takes only a `SHARE UPDATE EXCLUSIVE` lock, allowing concurrent reads and writes.\n5. **Once validated, convert to a real NOT NULL** with `ALTER TABLE t ALTER COLUMN c SET NOT NULL;` — Postgres 12+ recognizes the validated CHECK constraint and applies this instantly without a full re-scan; you can then drop the CHECK constraint if you want the plain NOT NULL form instead.\n6. **Set a timeout guard on every DDL step** (`SET lock_timeout = '2s'`) so any step that unexpectedly can't get its lock fails fast and retries, rather than queuing behind it and blocking other queries.\n\nIf you're on Postgres older than 11, step 1's default-add still rewrites the table, so batch that step too, or use a tool like `pg_repack`/`gh-ost`-style triggers instead of a raw `ALTER`."
+        },
+        "max": {
+          "outputTokens": 255,
+          "reduction": 93,
+          "bannedHits": [],
+          "articleDensity": 7.27,
+          "wordCount": 55,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [
+            "Never adds a DEFAULT value anywhere in the plan (only 'add the column nullable with no default'), despite the question explicitly asking for a NOT NULL column with a default — following this plan produces a column without the required default."
+          ],
+          "ambiguous": false,
+          "text": "Split it into three steps: add the column nullable with no default (instant, metadata-only in PG 11+), backfill in small batched updates so you don't hold long locks or bloat WAL, then add the `NOT NULL` via a `CHECK` constraint validated with `NOT VALID` followed by `VALIDATE CONSTRAINT` — Postgres 12+ lets you promote that check to `NOT NULL` without a full table rewrite."
+        }
+      }
+    },
+    {
+      "id": "n-plus-one",
+      "category": "diagnosis",
+      "prompt": "Our /orders endpoint got slow after we added a customer name to each row. It was 80ms, now it's 3 seconds for 200 orders. Using Hibernate. What happened?",
+      "baseline": {
+        "outputTokens": 2058,
+        "text": "This is the classic Hibernate **N+1 query problem**. Here's what almost certainly happened:\n\n## What changed\n\nBefore, `/orders` probably ran one query (or one query + a join) to fetch order rows — flat data, no relationship traversal. 80ms for 200 rows is consistent with a single round-trip.\n\nWhen you added \"customer name\" to each row, you likely did one of:\n\n```java\n// Entity\n@ManyToOne(fetch = FetchType.LAZY)  // or even EAGER\nprivate Customer customer;\n\n// In the mapping/DTO code\norder.getCustomer().getName()\n```\n\nNow, for each of the 200 orders, Hibernate has to resolve `order.getCustomer()`. If it's not already loaded (no join fetch), Hibernate fires a **separate `SELECT * FROM customer WHERE id = ?`** for every single order.\n\nResult: **1 query for orders + 200 queries for customers = 201 queries.** Each round-trip might only be ~10-15ms, but 200 of them serialized adds up to exactly the ~3 seconds you're seeing. This is almost too textbook — the math checks out perfectly (3000ms / 200 ≈ 15ms/query, typical DB round-trip latency).\n\n## How to confirm\n\nTurn on SQL logging and count the statements for one request:\n\n```properties\nspring.jpa.show-sql=true\nspring.jpa.properties.hibernate.generate_statistics=true\nlogging.level.org.hibernate.stat=debug\n```\n\nor just watch `logging.level.org.hibernate.SQL=debug`. If you see ~200 near-identical `select customer0_.* from customer ... where id=?` lines, that confirms it.\n\n## The fixes (pick based on the query pattern)\n\n**1. Fetch join (best when you always need the name in this query):**\n```java\n@Query(\"SELECT o FROM Order o JOIN FETCH o.customer WHERE ...\")\nList<Order> findAllWithCustomer();\n```\nCollapses it back to one query with a SQL join.\n\n**2. Batch fetching (good general-purpose fix, less invasive):**\n```java\n@ManyToOne(fetch = FetchType.LAZY)\n@BatchSize(size = 50)\nprivate Customer customer;\n```\nor globally: `hibernate.default_batch_fetch_size=50`. Instead of 200 individual selects, Hibernate groups them into `WHERE id IN (?, ?, ..., ?)` — turns 200 queries into ~4.\n\n**3. Entity Graph (JPA-standard alternative to fetch join):**\n```java\n@EntityGraph(attributePaths = {\"customer\"})\nList<Order> findAll();\n```\n\n**4. Projection/DTO query (leanest, if you only need the name, not the whole Customer):**\n```java\n@Query(\"SELECT new com.x.OrderRow(o.id, o.total, c.name) FROM Order o JOIN o.customer c\")\n```\nThis avoids loading full `Customer` entities at all — just pulls the name column via a join.\n\n## My recommendation\n\nIf this endpoint only ever needs `customer.name` and nothing else from Customer, go with **#4 (DTO projection)** — it's the fastest and avoids loading/hydrating entities you don't need. If you need the full Customer elsewhere too, **#1 (fetch join)** or **#3 (entity graph)** is simplest and gets you back to ~1-2 queries.\n\nAvoid just flipping to `FetchType.EAGER` on the association — that fixes this endpoint but silently makes *every other* query that loads `Order` do an implicit join or extra selects, which just moves the N+1 problem elsewhere.\n\nIf you want, share the actual entity/repository/controller code and I can point to the exact line and write the fix.",
+        "bannedHits": [],
+        "articleDensity": 6.42,
+        "wordCount": 374
+      },
+      "levels": {
+        "lite": {
+          "outputTokens": 1293,
+          "reduction": 37.2,
+          "bannedHits": [],
+          "articleDensity": 13.43,
+          "wordCount": 134,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Root cause is almost certainly an N+1 query problem: fetching the customer name pulls in a lazy `@ManyToOne`/`@OneToOne` association, and Hibernate now fires one extra `SELECT` per order row to resolve it — 200 orders becomes 201 queries instead of 1, which explains the jump from 80ms to 3s. Turn on SQL logging (`show-sql` / `format_sql`, or a query counter) to confirm the count matches roughly 200+1.\n\nFixes, in order of preference: use `JOIN FETCH customer` in the JPQL/HQL query (or a `@EntityGraph` covering the customer association) so it's pulled in one query with the orders; if you only need the name, project it directly with a DTO query (`select o, c.name from Order o join o.customer c`) to avoid loading the whole entity; as a fallback, `@BatchSize` on the association turns N+1 into N/batch-size+1, which helps but doesn't eliminate the problem the way a join does."
+        },
+        "full": {
+          "outputTokens": 1241,
+          "reduction": 39.7,
+          "bannedHits": [],
+          "articleDensity": 14.77,
+          "wordCount": 88,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "That is the classic Hibernate N+1 select problem: the customer name you added is likely a lazy-loaded association read per row, so accessing `order.getCustomer().getName()` in the loop over 200 orders fires 200 extra `SELECT` statements against `customers` instead of one. Fix it with a `JOIN FETCH` in the JPQL/HQL query (or an `@EntityGraph`) so the customer data comes back in the same query as the orders, or better, project directly into a DTO (`select new com.x.OrderSummary(o.id, o.total, c.name) from Order o join o.customer c`) so Hibernate never materializes the full `Customer` entity. Turn on `spring.jpa.show-sql=true` with `hibernate.generate_statistics=true` to confirm the query count before and after."
+        },
+        "max": {
+          "outputTokens": 628,
+          "reduction": 69.5,
+          "bannedHits": [],
+          "articleDensity": 8.82,
+          "wordCount": 34,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Adding `customer.name` triggered Hibernate's N+1 problem: each order's customer is now lazy-loaded with a separate query, turning 200 orders into ~201 round trips. Fix with a `JOIN FETCH` (or `@EntityGraph`) on the customer association in your query."
+        }
+      }
+    },
+    {
+      "id": "destructive-op",
+      "category": "yield-safety",
+      "prompt": "How do I drop the legacy_sessions table and all its data from our production database?",
+      "baseline": {
+        "outputTokens": 1439,
+        "text": "I don't have direct access to your production database, so I can't run this for you — but here's the safe way to do it yourself. Dropping a table in production is irreversible (it deletes both schema and data), so treat this as a high-risk change with a checklist, not a single command.\n\n## 1. Confirm it's actually safe to drop\n\n- **Search the codebase** for any references to `legacy_sessions` (queries, ORM models, migrations, background jobs, analytics/reporting scripts, cron jobs). Don't drop while something still reads/writes it.\n- **Check for dependents in the DB itself**: foreign keys pointing to/from it, views, triggers, stored procedures.\n  ```sql\n  -- Postgres example: find FKs referencing this table\n  SELECT conrelid::regclass AS table, conname\n  FROM pg_constraint\n  WHERE confrelid = 'legacy_sessions'::regclass;\n  ```\n- **Check size/usage** to gauge impact and confirm it's really unused (e.g., last write timestamp, row count, recent query stats).\n\n## 2. Get a backup before touching anything\n\nEven if you're sure, take a point-in-time snapshot or export so it's recoverable:\n\n```bash\n# Postgres — dump just this table\npg_dump -h <host> -U <user> -d <dbname> -t legacy_sessions -Fc -f legacy_sessions_backup_$(date +%Y%m%d).dump\n\n# MySQL\nmysqldump -h <host> -u <user> -p <dbname> legacy_sessions > legacy_sessions_backup_$(date +%Y%m%d).sql\n```\n\nAlso confirm your regular automated backups/PITR cover this moment, in case you need to restore later.\n\n## 3. Do it as a reviewed migration, not a manual console command\n\n- Add a migration file (Rails/Django/Alembic/Prisma/whatever you use) with `DROP TABLE legacy_sessions;` so it's version-controlled, reviewed, and applied consistently across environments.\n- Get a second engineer to review/approve, given it's destructive and irreversible.\n- Prefer a **two-step rollout** if you want a safety net:\n  1. Rename the table (`ALTER TABLE legacy_sessions RENAME TO legacy_sessions_pending_drop;`) and deploy/monitor for a while.\n  2. Once confident nothing breaks, drop it for real in a follow-up migration.\n\n## 4. The actual drop\n\n```sql\nDROP TABLE IF EXISTS legacy_sessions;\n```\n\nAdd `CASCADE` only if you've already confirmed and accepted the dependent objects it would also remove — don't use it blindly.\n\n## 5. After dropping\n\n- Deploy/monitor error rates and logs for any code path that still references the table.\n- Remove now-dead code/ORM models referencing `legacy_sessions`.\n- Keep the backup for a defined retention window in case something surfaces later.\n\nIf you tell me what database engine and migration framework you're using (Postgres/MySQL + Rails/Django/Prisma/etc.), I can help you draft the exact migration file.",
+        "bannedHits": [],
+        "articleDensity": 7.34,
+        "wordCount": 327
+      },
+      "levels": {
+        "lite": {
+          "outputTokens": 803,
+          "reduction": 44.2,
+          "bannedHits": [],
+          "articleDensity": 8.26,
+          "wordCount": 121,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Before dropping `legacy_sessions` in production:\n\n1. **Back it up first**, even if you're confident it's unused: `pg_dump -t legacy_sessions -Fc your_db > legacy_sessions_backup.dump` (adjust for your DB engine). This is what lets you undo the drop if something still depends on the table.\n2. **Confirm nothing references it** — check foreign keys, views, triggers, and application code for reads/writes to `legacy_sessions`.\n3. **Run it in a transaction if your DB supports transactional DDL** (Postgres does; MySQL does not):\n   ```sql\n   BEGIN;\n   DROP TABLE legacy_sessions;\n   -- verify, then COMMIT or ROLLBACK\n   ```\n4. **Execute during a low-traffic window** and have the backup file accessible in case you need to restore.\n\nThe command itself, once you're ready:\n```sql\nDROP TABLE legacy_sessions;\n```\n\nThis permanently deletes the table and all its rows — there's no undo without the backup from step 1. Confirm the backup succeeded before running the drop."
+        },
+        "full": {
+          "outputTokens": 831,
+          "reduction": 42.3,
+          "bannedHits": [],
+          "articleDensity": 7.38,
+          "wordCount": 149,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Dropping a table in production is irreversible, so back it up first and confirm nothing still depends on it.\n\n1. Back up the table: `pg_dump -t legacy_sessions -Fc your_db > legacy_sessions_backup.dump` (or your database's equivalent), so you can restore it if the drop turns out to be wrong.\n2. Confirm no code, foreign keys, or scheduled jobs still reference `legacy_sessions` — check for `REFERENCES legacy_sessions` in other tables' constraints, since those will block or cascade the drop.\n3. Run the drop in a transaction where supported, so you can roll back if something unexpected happens:\n   ```sql\n   BEGIN;\n   DROP TABLE legacy_sessions;\n   -- verify impact, then:\n   COMMIT;\n   ```\n4. If foreign keys reference it and you intend to remove those too, use `DROP TABLE legacy_sessions CASCADE;` — but only after confirming what CASCADE will also delete, since it silently drops dependent objects.\n\nDo this during a maintenance window if the table is large or actively read, since `DROP TABLE` takes an exclusive lock that blocks concurrent queries on it. Confirm the backup completed successfully before running the drop."
+        },
+        "max": {
+          "outputTokens": 422,
+          "reduction": 70.7,
+          "bannedHits": [],
+          "articleDensity": 7.14,
+          "wordCount": 42,
+          "grammatical": true,
+          "fragments": [],
+          "factsLost": [],
+          "ambiguous": false,
+          "text": "Back up the table first, then drop it in a transaction you can still cancel before commit:\n\n```sql\n-- 1. Backup (verify this succeeds before continuing)\nCREATE TABLE legacy_sessions_backup_20260726 AS TABLE legacy_sessions;\n\n-- 2. Drop\nBEGIN;\nDROP TABLE legacy_sessions;\n-- inspect, then:\nCOMMIT;   -- or ROLLBACK; if anything looks wrong\n```\n\nThis is irreversible once committed — confirm the backup exists and that no application code, foreign keys, or scheduled jobs still reference `legacy_sessions` before running `COMMIT`."
+        }
+      }
+    }
+  ]
+}

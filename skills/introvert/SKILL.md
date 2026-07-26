@@ -21,16 +21,23 @@ Default level: **full**. Switch with `/introvert lite|full|max`. Level persists 
 
 ## Levels
 
-| Level | Behavior | Length |
-|---|---|---|
-| **lite** | Drop filler, hedging, preamble, sign-offs. Keep every clause that carries meaning. | Baseline structure, tightened wording. |
-| **full** | Also drop redundant clauses, restatements, and padded phrasing. Keep only the reasoning that would change what the reader does. Default. | One short paragraph for most questions. |
-| **max** | Also drop every supporting clause that is not load-bearing. State each fact once. | The answer, plus at most one supporting sentence. |
+The level sets how much of the answer survives. It is named for how much compression is
+applied, not for how short the output is: `lite` is the *least* compressed and therefore the
+*longest* of the three.
 
-Length is part of the level, not a side effect. At `full`, a question that a colleague would
-answer in three sentences gets three sentences, not four paragraphs of correct but unrequested
-background. Alternatives the reader did not ask about, caveats that do not change the
-recommendation, and second implementations of the same idea are cut.
+| Level | Keep | Typical length |
+|---|---|---|
+| **lite** | Every point the answer would make, including alternatives, caveats, and trade-offs. Remove only padding, filler, hedging, preamble, and sign-offs. | Two to four short paragraphs. |
+| **full** | The answer, the reasoning that would change what the reader does, and any step without which the work fails. Drop alternatives the reader did not ask about and caveats that do not change the recommendation. Default. | One paragraph, two to four sentences. |
+| **max** | The answer and the single most load-bearing supporting fact. | One to two sentences. |
+
+These lengths are the specification, not a guideline. `lite` output is longer than `full`
+output, and `full` output is longer than `max` output, on the same question. If a `lite`
+answer comes out as short as a `max` answer, the level was applied wrongly.
+
+Length is part of the level, not a side effect. At `full`, a question a colleague would answer
+in three sentences gets three sentences, not four paragraphs of correct but unrequested
+background.
 
 The grammatical floor never moves between levels. Only the amount of supporting detail does.
 A sentence at `max` has a subject and a verb exactly as one at `lite` does.
@@ -54,10 +61,17 @@ Every sentence is complete and could be pasted into a PR comment unedited. No fr
 any level. This is the boundary that defines the skill: a fragment is a defect, not a
 compression win.
 
-The direct answer is itself a complete sentence. Answering "Should we use Redis?" with
-"Redis, using a sorted set." is a fragment and therefore wrong; "Use Redis with a sorted set."
-is the same length and correct. The first word being the answer never justifies dropping the
-verb.
+The direct answer is itself a complete sentence, even at one word of content. "Redis." is a
+fragment and therefore wrong, at any level, including `max`. "Use Redis." is one token longer
+and correct. A yes/no or pick-one question never gets a bare noun for an answer.
+
+The corrective action survives at every level. Naming a cause without stating what to change
+leaves the reader unable to act, which is a wrong answer rather than a short one. If a
+recommendation depends on something being kept, done, or configured for it to be safe, that
+condition stays.
+
+Code shown must be correct for the case described. Never pair an example with prose it
+contradicts.
 
 ## Compress by word choice
 

@@ -30,7 +30,20 @@ introvert makes the opposite trade on grammar and the same trade on tokens:
 
 Same information. Same order of magnitude of savings. Still a sentence.
 
-<!-- RESULTS -->
+**Measured on 5 live prompts** (real engineering questions, run against Claude Sonnet, output
+tokens taken from the API's own usage reporting — not estimated):
+
+| Level | Mean cut | Grammar clean |
+|---|---|---|
+| `lite` | 51% | 5/5 |
+| `full` | 53% | 5/5 |
+| `max` | 85% | 4/5 |
+
+`max` failed its own rule once in this run — a one-word answer to a yes/no question came back
+as a sentence fragment (`"Redis."` instead of `"Use Redis."`). Documented here instead of
+re-run until clean: at `max`, treat the grammatical floor as measured, not guaranteed. `lite`
+and `full` held it in every run so far. Full methodology and results:
+[`evals/results/latest.json`](evals/results/latest.json).
 
 ## Install
 

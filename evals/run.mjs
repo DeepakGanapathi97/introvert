@@ -39,15 +39,33 @@ const BANNED = [
   'not just a', "it's not just", 'as we can see', "let's look at"
 ]
 
+// Set once a rate limit is observed, so remaining queued items fail fast instead of
+// each burning a full call against a quota that is already known to be exhausted.
+let rateLimited = null
+
 async function ask (systemPrompt, prompt) {
-  const { stdout } = await exec('claude', [
-    '-p', prompt,
-    '--system-prompt', systemPrompt,
-    '--model', MODEL,
-    '--output-format', 'json'
-  ], { maxBuffer: 20 * 1024 * 1024, cwd: root })
+  if (rateLimited) throw new Error(`skipped: ${rateLimited}`)
+  let stdout
+  try {
+    ;({ stdout } = await exec('claude', [
+      '-p', prompt,
+      '--system-prompt', systemPrompt,
+      '--model', MODEL,
+      '--output-format', 'json'
+    ], { maxBuffer: 20 * 1024 * 1024, cwd: root }))
+  } catch (err) {
+    // The CLI exits non-zero on an API error but still writes the JSON body to stdout;
+    // execFile attaches that stdout to the rejection, so recover it before giving up.
+    stdout = err.stdout
+    if (!stdout) throw err
+  }
   const parsed = JSON.parse(stdout)
-  if (parsed.is_error) throw new Error(parsed.result || 'model returned an error')
+  if (parsed.is_error) {
+    if (parsed.api_error_status === 429 || /session limit|rate limit/i.test(parsed.result || '')) {
+      rateLimited = parsed.result || 'rate limited'
+    }
+    throw new Error(parsed.result || 'model returned an error')
+  }
   return { text: parsed.result, outputTokens: parsed.usage.output_tokens }
 }
 
@@ -66,9 +84,16 @@ function staticChecks (text) {
   return { bannedHits, articleDensity, wordCount: words.length }
 }
 
-/** What regex cannot judge: is every sentence complete, and did any fact go missing. */
-async function judge (baselineText, compressedText, prompt) {
-  const instruction = `You are grading a deliberately compressed answer against a longer baseline answer to the same question.
+/**
+ * What regex cannot judge: is every sentence complete, and did any fact go missing.
+ * Grades every level for a prompt in ONE call instead of one call per level — this is
+ * the single biggest cost lever in the harness, since judge calls are half the total.
+ */
+async function judgeAll (baselineText, levelTexts, prompt) {
+  const levelBlock = Object.entries(levelTexts)
+    .map(([level, text]) => `--- ${level.toUpperCase()} ---\n${text}`)
+    .join('\n\n')
+  const instruction = `You are grading deliberately compressed answers against a longer baseline answer to the same question. Grade each compressed answer independently.
 
 QUESTION:
 ${prompt}
@@ -76,19 +101,19 @@ ${prompt}
 BASELINE ANSWER:
 ${baselineText}
 
-COMPRESSED ANSWER:
-${compressedText}
+COMPRESSED ANSWERS:
+${levelBlock}
 
-The compressed answer is SUPPOSED to be much shorter. Dropping background, alternatives the
-reader did not ask about, caveats that do not change the recommendation, and extra examples is
-CORRECT BEHAVIOR and must not be penalised.
+Each compressed answer is SUPPOSED to be much shorter than the baseline. Dropping background,
+alternatives the reader did not ask about, caveats that do not change the recommendation, and
+extra examples is CORRECT BEHAVIOR and must not be penalised.
 
-Reply with ONLY a JSON object, no prose, no code fence:
-{"grammatical": true/false, "fragments": ["sentences that are not complete grammatical sentences"], "factsLost": ["only facts whose absence makes the compressed answer WRONG, MISLEADING, or UNACTIONABLE"], "ambiguous": true/false}
+Reply with ONLY a JSON object, no prose, no code fence, one key per level you were given:
+{"lite": {"grammatical": true/false, "fragments": [...], "factsLost": [...], "ambiguous": true/false}, "full": {...}, "max": {...}}
 
 "grammatical" is false if ANY sentence lacks a subject or a main verb, or drops articles so it reads as telegraphic. Headings, list labels, and code blocks are exempt.
-"factsLost" lists ONLY material losses: something that makes the compressed answer incorrect, leads the reader to a wrong action, or omits a step without which the described work fails. A fact that is merely additional context is NOT a loss. A caveat describing a scenario the QUESTION already rules out is NOT a loss. A hedge or alternative the reader did not ask about is NOT a loss. Return an empty array if the compressed answer is correct and actionable for the situation as stated in the question.
-"ambiguous" is true only if the compressed answer could be MISREAD in a way that changes what the reader would do.`
+"factsLost" lists ONLY material losses: something that makes that compressed answer incorrect, leads the reader to a wrong action, or omits a step without which the described work fails. A fact that is merely additional context is NOT a loss. A caveat describing a scenario the QUESTION already rules out is NOT a loss. A hedge or alternative the reader did not ask about is NOT a loss. Empty array if the answer is correct and actionable for the situation as stated.
+"ambiguous" is true only if that answer could be MISREAD in a way that changes what the reader would do.`
   const { stdout } = await exec('claude', [
     '-p', instruction,
     '--system-prompt', 'You are a strict grader. Output only the requested JSON.',
@@ -99,18 +124,27 @@ Reply with ONLY a JSON object, no prose, no code fence:
   try {
     return JSON.parse(raw)
   } catch {
-    return { grammatical: null, fragments: [], factsLost: [], ambiguous: null, parseError: raw.slice(0, 200) }
+    const empty = { grammatical: null, fragments: [], factsLost: [], ambiguous: null, parseError: raw.slice(0, 200) }
+    return Object.fromEntries(Object.keys(levelTexts).map(l => [l, empty]))
   }
 }
 
-/** Run tasks with a bounded number in flight. */
+/**
+ * Run tasks with a bounded number in flight. A single item's rejection is caught and
+ * recorded, not thrown — one rate-limited or transient-error item must never take down
+ * every other item's already-computed result, and never stall the runner it was on.
+ */
 async function pool (items, limit, worker) {
   const results = []
   let cursor = 0
   const runners = Array.from({ length: Math.min(limit, items.length) }, async () => {
     while (cursor < items.length) {
       const index = cursor++
-      results[index] = await worker(items[index], index)
+      try {
+        results[index] = { status: 'fulfilled', value: await worker(items[index], index) }
+      } catch (err) {
+        results[index] = { status: 'rejected', reason: err }
+      }
     }
   })
   await Promise.all(runners)
@@ -119,18 +153,19 @@ async function pool (items, limit, worker) {
 
 console.log(`introvert evals — model=${MODEL} prompts=${corpus.length} levels=${LEVELS.join(',')}\n`)
 
-const rows = await pool(corpus, CONCURRENCY, async (item) => {
+const rawResults = await pool(corpus, CONCURRENCY, async (item) => {
   const baseline = await ask(NEUTRAL, item.prompt)
+  const runs = {}
+  for (const level of LEVELS) runs[level] = await ask(withRules(level), item.prompt)
+  const verdicts = await judgeAll(baseline.text, Object.fromEntries(LEVELS.map(l => [l, runs[l].text])), item.prompt)
   const levels = {}
   for (const level of LEVELS) {
-    const run = await ask(withRules(level), item.prompt)
-    const checks = staticChecks(run.text)
-    const verdict = await judge(baseline.text, run.text, item.prompt)
+    const run = runs[level]
     levels[level] = {
       outputTokens: run.outputTokens,
       reduction: +((1 - run.outputTokens / baseline.outputTokens) * 100).toFixed(1),
-      ...checks,
-      ...verdict,
+      ...staticChecks(run.text),
+      ...(verdicts[level] || {}),
       text: run.text
     }
   }
@@ -145,7 +180,29 @@ const rows = await pool(corpus, CONCURRENCY, async (item) => {
   }
 })
 
-const summary = { model: MODEL, promptCount: corpus.length, levels: {} }
+// One item's failure (rate limit, transient API error) must not discard every other
+// item's results. Isolate failures, report them, and score only what succeeded.
+const failed = []
+const rows = []
+for (let i = 0; i < corpus.length; i++) {
+  const outcome = rawResults[i]
+  if (outcome.status === 'fulfilled') {
+    rows.push(outcome.value)
+  } else {
+    const reason = outcome.reason?.message || String(outcome.reason)
+    failed.push({ id: corpus[i].id, error: reason })
+    console.error(`  ${corpus[i].id.padEnd(20)} FAILED: ${reason.split('\n')[0].slice(0, 120)}`)
+  }
+}
+
+if (rows.length === 0) {
+  console.error('\nEvery prompt failed. Nothing to score. Check the errors above.')
+  mkdirSync(join(root, 'evals', 'results'), { recursive: true })
+  writeFileSync(join(root, 'evals', 'results', 'latest.json'), JSON.stringify({ summary: null, rows: [], failed }, null, 2))
+  process.exit(1)
+}
+
+const summary = { model: MODEL, promptCount: corpus.length, completedCount: rows.length, failedCount: failed.length, levels: {} }
 for (const level of LEVELS) {
   const all = rows.map(r => r.levels[level])
   const mean = (nums) => +(nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(1)
