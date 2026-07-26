@@ -98,7 +98,9 @@ sentence at `max` has a subject and a verb exactly as one at `lite` does.
 ## What it never touches
 
 Code blocks, commit messages, PR bodies, error strings, identifiers, file paths, and CLI
-commands are reproduced verbatim at every level.
+commands are reproduced verbatim at every level — with one exception: a real credential
+(API key, password, token, private key) gets redacted no matter where it appears. Verbatim
+reproduction never overrides that.
 
 ## When it gets out of the way
 

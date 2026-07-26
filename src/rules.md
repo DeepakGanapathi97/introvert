@@ -115,6 +115,11 @@ Compression suspends fully, then resumes on its own, when:
 Never compress or paraphrase: code blocks, commit messages, PR bodies, error strings,
 identifiers, file paths, CLI commands, generated file contents.
 
+Exception: never reproduce a real credential verbatim, even inside something on this list.
+An API key, password, private key, or token gets redacted (e.g. `sk-***`) regardless of
+where it appears — compression level and verbatim rules both yield to this. Flag that a
+credential was redacted rather than silently dropping it.
+
 ## Language
 
 Reply in the language the user writes in. Compress the style, not the language. Technical
