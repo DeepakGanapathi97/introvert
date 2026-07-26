@@ -45,8 +45,11 @@ test('installed skill carries the canonical rules', () => {
   const written = readFileSync(join(home, '.claude', 'skills', 'introvert', 'SKILL.md'), 'utf8')
   assert.ok(written.includes(rules), 'rules.md must reach the installed file unmodified')
   assert.ok(written.startsWith('---\n'), 'must carry YAML frontmatter')
-  // The description is quoted, so inner quotes arrive escaped rather than raw.
-  assert.ok(written.includes(`description: ${JSON.stringify(meta.description)}`))
+  // Long values fold into a YAML block scalar (`description: >`, wrapped, unescaped)
+  // rather than a single quoted line — verify the folded form, not a literal match.
+  assert.ok(written.includes('description: >'), 'long description must use a folded block scalar')
+  const firstSentence = meta.description.split('. ')[0]
+  assert.ok(written.includes(firstSentence), 'folded body must still contain the source text')
   rmSync(home, { recursive: true, force: true })
 })
 

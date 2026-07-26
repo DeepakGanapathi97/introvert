@@ -1,6 +1,8 @@
 ---
 name: "introvert"
-description: "Toggle introvert. Usage: /introvert [lite|full|max|off]. Cuts output tokens while every sentence stays complete and grammatical. Precise, not fragmented."
+description: >
+  Toggle introvert. Usage: /introvert [lite|full|max|off]. Cuts output tokens while every sentence
+  stays complete and grammatical. Precise, not fragmented.
 ---
 
 # /introvert

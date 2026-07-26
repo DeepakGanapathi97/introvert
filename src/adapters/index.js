@@ -6,9 +6,38 @@ import { join } from 'node:path'
 
 const home = homedir()
 
-/** YAML frontmatter block. Values are quoted so colons in descriptions stay safe. */
+/** Wrap text into an indented YAML folded block scalar body (the lines under `key: >`). */
+function foldedBlock (text, width = 100, indent = '  ') {
+  const words = text.trim().split(/\s+/)
+  const lines = []
+  let line = ''
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word
+    if (next.length > width && line) {
+      lines.push(indent + line)
+      line = word
+    } else {
+      line = next
+    }
+  }
+  if (line) lines.push(indent + line)
+  return lines.join('\n')
+}
+
+/**
+ * YAML frontmatter block. Long values use a folded block scalar (`key: >`), the same
+ * style caveman's SKILL.md uses — wrapped across lines, no quote-escaping needed. That
+ * matches what skills.sh's summary extraction expects; our previous single-line,
+ * backslash-escaped JSON string produced a blank summary on the skills.sh listing page.
+ * Short values stay as quoted scalars.
+ */
 function frontmatter (fields) {
-  const lines = Object.entries(fields).map(([k, v]) => `${k}: ${JSON.stringify(v)}`)
+  const lines = Object.entries(fields).map(([k, v]) => {
+    if (typeof v === 'string' && v.length > 80) {
+      return `${k}: >\n${foldedBlock(v)}`
+    }
+    return `${k}: ${JSON.stringify(v)}`
+  })
   return `---\n${lines.join('\n')}\n---\n`
 }
 

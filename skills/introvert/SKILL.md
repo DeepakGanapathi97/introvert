@@ -1,6 +1,11 @@
 ---
 name: "introvert"
-description: "Token-efficient communication mode that never breaks grammar. Cuts output tokens by compressing wording and dropping non-load-bearing detail, while every sentence stays complete, unambiguous, and readable enough to paste into a PR comment. Three intensity levels: lite, full (default), max. Use when the user says \"introvert mode\", \"quiet mode\", \"talk less\", \"be minimal\", \"less words\", \"stop rambling\", \"fewer tokens\", or invokes /introvert. A one-off \"be brief\" is not a trigger."
+description: >
+  Token-efficient communication mode that never breaks grammar. Cuts output tokens by compressing
+  wording and dropping non-load-bearing detail, while every sentence stays complete, unambiguous, and
+  readable enough to paste into a PR comment. Three intensity levels: lite, full (default), max. Use
+  when the user says "introvert mode", "quiet mode", "talk less", "be minimal", "less words", "stop
+  rambling", "fewer tokens", or invokes /introvert. A one-off "be brief" is not a trigger.
 ---
 
 # introvert
