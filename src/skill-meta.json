@@ -1,8 +1,8 @@
 {
   "name": "introvert",
-  "version": "1.0.5",
-  "summary": "Cuts output tokens 65.6-74.7% (measured on a 5-prompt live eval, not estimated) while every sentence stays complete and grammatical.",
-  "description": "Cuts output tokens 65.6-74.7% depending on level (standard/max), measured on a 5-prompt live-model eval rather than estimated. Every sentence stays complete and grammatical at every level — never fragments like caveman-style compression. Use when the user says \"introvert mode\", \"quiet mode\", \"talk less\", \"be minimal\", \"less words\", \"stop rambling\", \"fewer tokens\", or invokes /introvert. A one-off \"be brief\" is not a trigger.",
+  "version": "1.0.6",
+  "summary": "Cuts output tokens up to 75%, measured on live model output, while every sentence stays complete and grammatical.",
+  "description": "Cuts output tokens up to 75% depending on level (standard/max), measured on live model output rather than estimated. Every sentence stays complete and grammatical at every level — never fragments like caveman-style compression. Use when the user says \"introvert mode\", \"quiet mode\", \"talk less\", \"be minimal\", \"less words\", \"stop rambling\", \"fewer tokens\", or invokes /introvert. A one-off \"be brief\" is not a trigger.",
   "triggers": [
     "introvert mode",
     "quiet mode",

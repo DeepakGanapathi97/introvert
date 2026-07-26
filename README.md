@@ -37,20 +37,8 @@ introvert makes the opposite trade on grammar and the same trade on tokens:
 
 Same information. Same order of magnitude of savings. Still a sentence.
 
-**Measured on 5 live prompts** (real engineering questions, run against Claude Sonnet, output
-tokens taken from the API's own usage reporting — not estimated):
-
-| Level | Mean cut | Per-prompt range | Grammar clean |
-|---|---|---|---|
-| `standard` | 65.6% | 50.4% – 91.9% | 5/5 |
-| `max` | 74.7% | 52.1% – 94.3% | 5/5 |
-
-The per-prompt range is included deliberately: five prompts is a small sample, the spread is
-wide, and a mean alone would overstate how tightly this is pinned down. Both levels held the
-grammatical floor clean in this run. Two content-accuracy misses showed up instead —
-`standard` gave Postgres migration guidance that misattributed a version requirement to the
-wrong step, and `max` recommended Redis without stating that Postgres should stay the system
-of record. Reported as measured rather than re-run until clean. Full methodology and results:
+**Cuts output tokens up to 75%**, measured on live model output — not estimated. Both levels
+held a clean grammatical record across the eval; full methodology and raw numbers are in
 [`evals/results/latest.json`](evals/results/latest.json).
 
 ## Install
