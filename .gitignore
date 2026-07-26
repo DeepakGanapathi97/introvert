@@ -1,0 +1,6 @@
+node_modules/
+*.log
+.DS_Store
+*.bak
+evals/results/*.json
+!evals/results/latest.json

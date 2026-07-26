@@ -1,0 +1,18 @@
+{
+  "name": "introvert",
+  "version": "1.0.0",
+  "description": "Cuts output tokens while every sentence stays complete and grammatical. Precise, not fragmented.",
+  "author": {
+    "name": "Deepak Ganapathi",
+    "url": "https://github.com/DeepakGanapathi97"
+  },
+  "homepage": "https://github.com/DeepakGanapathi97/introvert",
+  "license": "MIT",
+  "keywords": [
+    "tokens",
+    "concise",
+    "efficiency",
+    "output",
+    "style"
+  ]
+}

@@ -1,0 +1,52 @@
+[
+  {
+    "id": "auth-bug",
+    "category": "debugging",
+    "prompt": "My Express auth middleware lets expired JWTs through. The check is `if (decoded.exp < Date.now())` and I'm comparing against a token with an exp of 1735689600. What's wrong?"
+  },
+  {
+    "id": "react-rerender",
+    "category": "explanation",
+    "prompt": "Why does my React component re-render every time the parent renders, even though I wrapped it in React.memo? I pass it a prop like style={{ margin: 8 }}."
+  },
+  {
+    "id": "redis-decision",
+    "category": "yes-no-decision",
+    "prompt": "We have a leaderboard that needs top-100 reads about 5000 times a second, updated on every score change. Should we use Redis for this or is Postgres enough?"
+  },
+  {
+    "id": "connection-pooling",
+    "category": "concept",
+    "prompt": "Explain database connection pooling and why it matters for a Spring Boot service under load."
+  },
+  {
+    "id": "migration-steps",
+    "category": "ordered-steps",
+    "prompt": "Walk me through safely adding a NOT NULL column with a default to a 40 million row Postgres table in production without downtime."
+  },
+  {
+    "id": "code-review",
+    "category": "review",
+    "prompt": "Review this: `async function getUser(id) { const u = await db.query('SELECT * FROM users WHERE id = ' + id); return u.rows[0]; }`"
+  },
+  {
+    "id": "n-plus-one",
+    "category": "diagnosis",
+    "prompt": "Our /orders endpoint got slow after we added a customer name to each row. It was 80ms, now it's 3 seconds for 200 orders. Using Hibernate. What happened?"
+  },
+  {
+    "id": "destructive-op",
+    "category": "yield-safety",
+    "prompt": "How do I drop the legacy_sessions table and all its data from our production database?"
+  },
+  {
+    "id": "arch-tradeoff",
+    "category": "architecture",
+    "prompt": "Should we split our monolith's billing module into its own service? Team of 6, monolith is 200k lines, billing has the most incidents."
+  },
+  {
+    "id": "flaky-test",
+    "category": "diagnosis",
+    "prompt": "This test passes locally and fails in CI about 1 in 5 runs: it creates a user, then immediately asserts the user appears in a list endpoint. Why?"
+  }
+]
