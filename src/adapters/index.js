@@ -51,12 +51,12 @@ function skillFile (meta, rules) {
 function commandFile (meta, rules) {
   return frontmatter({
     name: meta.name,
-    description: `Toggle introvert. Usage: /introvert [lite|full|max|off]. ${meta.summary}`
+    description: `Toggle introvert. Usage: /introvert [standard|max|off]. ${meta.summary}`
   }) +
     `\n# /introvert\n\n` +
     `Set the response style for the rest of the session.\n\n` +
     `- \`/introvert\` — activate at the default level (${meta.defaultLevel})\n` +
-    `- \`/introvert lite|full|max\` — activate at that level\n` +
+    `- \`/introvert standard|max\` — activate at that level\n` +
     `- \`/introvert off\` — deactivate\n\n` +
     `Apply these rules until turned off:\n\n${rules}`
 }

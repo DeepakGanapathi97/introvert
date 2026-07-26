@@ -48,8 +48,10 @@ test('installed skill carries the canonical rules', () => {
   // Long values fold into a YAML block scalar (`description: >`, wrapped, unescaped)
   // rather than a single quoted line — verify the folded form, not a literal match.
   assert.ok(written.includes('description: >'), 'long description must use a folded block scalar')
-  const firstSentence = meta.description.split('. ')[0]
-  assert.ok(written.includes(firstSentence), 'folded body must still contain the source text')
+  // A YAML folded scalar wraps long lines, so compare with whitespace collapsed rather
+  // than as a literal substring — wrapping can land mid-sentence.
+  const normalize = (s) => s.replace(/\s+/g, ' ').trim()
+  assert.ok(normalize(written).includes(normalize(meta.description)), 'folded body must contain the source text, modulo line wrapping')
   rmSync(home, { recursive: true, force: true })
 })
 

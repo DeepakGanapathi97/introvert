@@ -105,7 +105,7 @@ for (const agent of targets) {
 
 if (!opts.uninstall && !opts.dryRun && failures === 0) {
   console.log(`\nDone. Start a new session and type /introvert to turn it on.`)
-  console.log(`Levels: /introvert lite | full (default) | max. Turn off with /introvert off.`)
+  console.log(`Levels: /introvert standard (default) | max. Turn off with /introvert off.`)
 }
 
 process.exit(failures > 0 ? 1 : 0)

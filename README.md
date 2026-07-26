@@ -42,14 +42,16 @@ tokens taken from the API's own usage reporting — not estimated):
 
 | Level | Mean cut | Grammar clean |
 |---|---|---|
-| `lite` | 51% | 5/5 |
-| `full` | 53% | 5/5 |
-| `max` | 85% | 4/5 |
+| `standard` | 66% | 5/5 |
+| `max` | 75% | 5/5 |
 
-`max` failed its own rule once in this run — a one-word answer to a yes/no question came back
-as a sentence fragment (`"Redis."` instead of `"Use Redis."`). Documented here instead of
-re-run until clean: at `max`, treat the grammatical floor as measured, not guaranteed. `lite`
-and `full` held it in every run so far. Full methodology and results:
+Both levels held the grammatical floor clean in this run. Two content-accuracy misses showed
+up instead — `standard` gave Postgres migration guidance that misattributed a version
+requirement to the wrong step, and `max` recommended Redis without stating that Postgres
+should stay the system of record. Both are judged real losses, not judge over-strictness, and
+both are precision misses under generation variance in a technical domain — not a rule design
+gap the way the earlier fragment and level-inversion bugs were. Reported as measured rather
+than re-run until clean. Full methodology and results:
 [`evals/results/latest.json`](evals/results/latest.json).
 
 ## Install
@@ -73,8 +75,7 @@ That file is the whole skill; everything else is packaging.
 ## Use
 
 ```
-/introvert            activate at full (default)
-/introvert lite       lighter compression
+/introvert            activate at standard (default)
 /introvert max        hardest compression
 /introvert off        deactivate
 ```
@@ -88,12 +89,11 @@ A one-off "be brief" does **not** activate it. That asks for one short answer, n
 
 | Level | Cuts | Length |
 |---|---|---|
-| `lite` | Filler, hedging, preamble, sign-offs | Baseline structure, tightened wording |
-| `full` | Also redundant clauses, restatements, padded phrasing | One short paragraph for most questions |
+| `standard` | Filler, hedging, preamble, redundant clauses, restatements, padded phrasing | One short paragraph for most questions |
 | `max` | Also every supporting clause that is not load-bearing | The answer, plus at most one supporting sentence |
 
 The grammatical floor never moves between levels. Only the amount of supporting detail does. A
-sentence at `max` has a subject and a verb exactly as one at `lite` does.
+sentence at `max` has a subject and a verb exactly as one at `standard` does.
 
 ## What it never touches
 
@@ -154,6 +154,18 @@ Every run is then graded on four gates:
 
 A failure on grammar, vocabulary, or parity blocks a release regardless of how good the token
 number looks. The token number is the reward; the gates are the product.
+
+## What we tried and cut
+
+introvert originally shipped three levels — `lite`, `full`, `max`. The eval measured `lite`
+at 51% mean reduction and `full` at 53%, essentially the same number, on every single prompt
+in the corpus, not just in aggregate. Two tiers that produce nearly identical output aren't
+two tiers; `lite` was cut rather than kept as a placebo option, and the remaining level was
+renamed `full` → `standard` (`full` reads as "uncompressed," which is backwards for the
+lighter of two compression tiers). A follow-up eval on the two-level version confirmed the
+cut worked: the gap widened from 2 points to 9 (`standard` 66% vs `max` 75%), a real
+separation instead of a coin flip. If a middle tier comes back, it ships with rules specific
+enough that the eval shows a gap that size, not just a description that sounds different.
 
 ## Development
 

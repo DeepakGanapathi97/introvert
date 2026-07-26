@@ -3,7 +3,7 @@
 // introvert rules, measures the output tokens the API actually reported, and checks
 // that the compressed answers stayed grammatical and kept every technical fact.
 //
-// Usage: node evals/run.mjs [--model sonnet] [--concurrency 4] [--levels lite,full,max]
+// Usage: node evals/run.mjs [--model sonnet] [--concurrency 4] [--levels standard,max]
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs'
@@ -22,7 +22,7 @@ const arg = (flag, fallback) => {
 
 const MODEL = arg('--model', 'sonnet')
 const CONCURRENCY = Number(arg('--concurrency', '4'))
-const LEVELS = arg('--levels', 'lite,full,max').split(',')
+const LEVELS = arg('--levels', 'standard,max').split(',')
 
 // Both arms get the same neutral system prompt. Only the rules differ, so the
 // measured difference is attributable to the rules and nothing else.
@@ -109,7 +109,7 @@ alternatives the reader did not ask about, caveats that do not change the recomm
 extra examples is CORRECT BEHAVIOR and must not be penalised.
 
 Reply with ONLY a JSON object, no prose, no code fence, one key per level you were given:
-{"lite": {"grammatical": true/false, "fragments": [...], "factsLost": [...], "ambiguous": true/false}, "full": {...}, "max": {...}}
+{"standard": {"grammatical": true/false, "fragments": [...], "factsLost": [...], "ambiguous": true/false}, "max": {...}}
 
 "grammatical" is false if ANY sentence lacks a subject or a main verb, or drops articles so it reads as telegraphic. Headings, list labels, and code blocks are exempt.
 "factsLost" lists ONLY material losses: something that makes that compressed answer incorrect, leads the reader to a wrong action, or omits a step without which the described work fails. A fact that is merely additional context is NOT a loss. A caveat describing a scenario the QUESTION already rules out is NOT a loss. A hedge or alternative the reader did not ask about is NOT a loss. Empty array if the answer is correct and actionable for the situation as stated.

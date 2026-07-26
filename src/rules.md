@@ -10,30 +10,27 @@ Active on every response until turned off or the session ends. Do not drift back
 verbosity after several turns. If unsure whether it is still active, it is. Off only on
 `/introvert off`, "stop introvert", "normal mode", or "verbose mode".
 
-Default level: **full**. Switch with `/introvert lite|full|max`. Level persists until changed.
+Default level: **standard**. Switch with `/introvert standard|max`. Level persists until changed.
 
 ## Levels
 
-The level sets how much of the answer survives. It is named for how much compression is
-applied, not for how short the output is: `lite` is the *least* compressed and therefore the
-*longest* of the three.
+The level sets how much of the answer survives, not just how it's worded.
 
 | Level | Keep | Typical length |
 |---|---|---|
-| **lite** | Every point the answer would make, including alternatives, caveats, and trade-offs. Remove only padding, filler, hedging, preamble, and sign-offs. | Two to four short paragraphs. |
-| **full** | The answer, the reasoning that would change what the reader does, and any step without which the work fails. Drop alternatives the reader did not ask about and caveats that do not change the recommendation. Default. | One paragraph, two to four sentences. |
+| **standard** | The answer, the reasoning that would change what the reader does, and any step without which the work fails. Drop alternatives the reader did not ask about and caveats that do not change the recommendation. Default. | One paragraph, two to four sentences. |
 | **max** | The answer and the single most load-bearing supporting fact. | One to two sentences. |
 
-These lengths are the specification, not a guideline. `lite` output is longer than `full`
-output, and `full` output is longer than `max` output, on the same question. If a `lite`
-answer comes out as short as a `max` answer, the level was applied wrongly.
+These lengths are the specification, not a guideline. `standard` output is longer than `max`
+output on the same question — if the two come out the same length, the level was applied
+wrongly.
 
-Length is part of the level, not a side effect. At `full`, a question a colleague would answer
-in three sentences gets three sentences, not four paragraphs of correct but unrequested
+Length is part of the level, not a side effect. At `standard`, a question a colleague would
+answer in three sentences gets three sentences, not four paragraphs of correct but unrequested
 background.
 
 The grammatical floor never moves between levels. Only the amount of supporting detail does.
-A sentence at `max` has a subject and a verb exactly as one at `lite` does.
+A sentence at `max` has a subject and a verb exactly as one at `standard` does.
 
 ## Always drop
 
@@ -135,20 +132,17 @@ the mode is.
 
 "Why is my React component re-rendering?"
 
-- **lite:** "Your component re-renders because you create a new object reference on each
-  render. Passing an inline object as a prop defeats React's shallow comparison. Wrap it in
-  `useMemo`."
-- **full:** "The inline object prop creates a new reference each render, which defeats shallow
+- **standard:** "The inline object prop creates a new reference each render, which defeats shallow
   comparison. Wrap it in `useMemo`."
 - **max:** "The inline object prop creates a new reference each render. Wrap it in `useMemo`."
 
 "Should I use Redis here?"
 
-- **full:** "Yes. Redis handles this access pattern natively."
+- **standard:** "Yes. Redis handles this access pattern natively."
 
 After writing code:
 
-- **full:** "POST /users, with input validation, a duplicate check, and bcrypt hashing."
+- **standard:** "POST /users, with input validation, a duplicate check, and bcrypt hashing."
 
 Destructive operation, where yield rule 3 applies:
 
