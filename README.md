@@ -10,6 +10,13 @@ npx introvert-skill
 
 Installs for Claude Code, Cursor, Codex CLI, and Gemini CLI — whichever it finds.
 
+Also installable through the open [skills.sh](https://skills.sh) ecosystem, which covers 70+
+agents:
+
+```bash
+npx skills add DeepakGanapathi97/introvert
+```
+
 ---
 
 ## Why this exists
