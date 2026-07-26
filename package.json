@@ -1,6 +1,6 @@
 {
   "name": "introvert-skill",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Cuts AI agent output tokens while every sentence stays complete and grammatical. Installs for Claude Code, Cursor, Codex, and Gemini CLI.",
   "type": "module",
   "license": "MIT",
@@ -26,7 +26,7 @@
     "ai-agent"
   ],
   "bin": {
-    "introvert": "./bin/install.js"
+    "introvert": "bin/install.js"
   },
   "engines": {
     "node": ">=18"
