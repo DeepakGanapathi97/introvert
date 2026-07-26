@@ -1,8 +1,8 @@
 ---
 name: "introvert"
 description: >
-  Toggle introvert. Usage: /introvert [standard|max|off]. Cuts output tokens 66-75% (measured, not
-  estimated) while every sentence stays complete and grammatical. Precise, not fragmented.
+  Toggle introvert. Usage: /introvert [standard|max|off]. Cuts output tokens 65.6-74.7% (measured on a
+  5-prompt live eval, not estimated) while every sentence stays complete and grammatical.
 ---
 
 # /introvert

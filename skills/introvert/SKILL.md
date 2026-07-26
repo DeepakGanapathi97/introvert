@@ -1,11 +1,11 @@
 ---
 name: "introvert"
 description: >
-  Cuts output tokens 66-75% depending on level (standard/max), measured on live model output rather
-  than estimated. Every sentence stays complete and grammatical at every level — never fragments like
-  caveman-style compression. Use when the user says "introvert mode", "quiet mode", "talk less", "be
-  minimal", "less words", "stop rambling", "fewer tokens", or invokes /introvert. A one-off "be brief"
-  is not a trigger.
+  Cuts output tokens 65.6-74.7% depending on level (standard/max), measured on a 5-prompt live-model
+  eval rather than estimated. Every sentence stays complete and grammatical at every level — never
+  fragments like caveman-style compression. Use when the user says "introvert mode", "quiet mode",
+  "talk less", "be minimal", "less words", "stop rambling", "fewer tokens", or invokes /introvert. A
+  one-off "be brief" is not a trigger.
 ---
 
 # introvert

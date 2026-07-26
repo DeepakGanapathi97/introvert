@@ -1,7 +1,7 @@
 {
   "name": "introvert",
-  "version": "1.0.4",
-  "description": "Cuts output tokens 66-75% (measured, not estimated) while every sentence stays complete and grammatical. Precise, not fragmented.",
+  "version": "1.0.5",
+  "description": "Cuts output tokens 65.6-74.7% (measured on a 5-prompt live eval, not estimated) while every sentence stays complete and grammatical.",
   "author": {
     "name": "Deepak Ganapathi",
     "url": "https://github.com/DeepakGanapathi97"
